@@ -26,9 +26,6 @@ def getMdsRandCorrData():
     # Parameters
     sample_size = 1000
 
-
-    
-
     # import csv file
     with open('static/data/Clean-Data.csv', 'r') as f:
         reader = csv.reader(f)
@@ -36,7 +33,6 @@ def getMdsRandCorrData():
         rowName = inFile[0]
         inFile = inFile[1:][1:]
         # print(inFile)
-
 
     # All row names
     rowName = rowName[1:]
@@ -72,7 +68,6 @@ def getMdsRandCorrData():
 
     # outputData =  pd.DataFrame(mdsRandCorrOutputData, columns=rowName)
     return { "data": [ { "headers": rowName,"randomInputData":randInputDatawithcountries , "data": mdsRandCorrOutputData } ] }
-
 
 @app.route("/")
 def index():
