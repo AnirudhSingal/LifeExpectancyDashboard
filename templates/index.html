@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+
+<head>
+  <meta charset="utf-8">
+  <title>Visualization Final Project</title>
+
+  <script src="{{ url_for('static', filename='js/d3.v4.min.js')}}"></script>
+  <script src="{{ url_for('static', filename='js/jquery-2.2.4.min.js')}}"></script>
+  <script src="{{ url_for('static', filename='js/queue.v1.min.js')}}"></script>
+  <script src="{{ url_for('static', filename='js/d3-tip.js')}}"></script>
+  <script src="{{ url_for('static', filename='js/topojson.min.js')}}"></script>
+  <script src="https://d3js.org/d3-color.v2.min.js"></script>
+  <script src="https://d3js.org/d3-interpolate.v2.min.js"></script>
+  <script src="https://d3js.org/d3-scale-chromatic.v2.min.js"></script>
+  <script src="https://d3js.org/d3-time.v2.min.js"></script>
+  <script src="https://d3js.org/d3-time-format.v3.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3-legend/2.25.6/d3-legend.min.js"></script>
+
+
+
+
+  <!-- <link rel='stylesheet' type="text/css" href="{{ url_for('static', filename='styles/button.css')}}" />
+  <link rel='stylesheet' type="text/css" href="{{ url_for('static', filename='styles/main.css')}}" />
+  <link rel='stylesheet' type="text/css" href="{{ url_for('static', filename='styles/d3-tip.css')}}" />
+  <link rel='stylesheet' type="text/css" href="{{ url_for('static', filename='styles/parallel.css')}}" /> -->
+
+  <!-- <script src="{{ url_for('static', filename='js/parallelCoords.js')}}"></script>
+  <script src="{{ url_for('static', filename='js/worldMap.js')}}"></script>
+  <script src="{{ url_for('static', filename='js/barChart.js')}}"></script> -->
+
+
+  <link rel='stylesheet' type="text/css" href="{{ url_for('static', filename='styles/style.css')}}" />
+
+  <script type="module">
+    import { updateWorldMap, createWorldMap } from './static/js/worldMap.js'
+    import { createLineChart } from './static/js/line-chart.module.js'
+    import { createMdsPlot } from './static/js/mds-plot.module.js'
+    import { createBubbleScatterplot } from './static/js/bubble-scatterplot.module.js'
+    import { createParallelCoordsPlot } from './static/js/parallel-coords.module.js'
+
+
+    var _selectedCountries = [];
+    document.getElementById("reset-button").addEventListener("click", resetData);
+
+    d3.csv("/static/data/Clean-Data.csv", function (err, demoData) {
+      setVisible('#mds-corr-plot', false);
+      setVisible('#mds-plot-loader', true);
+      _selectedCountries = [];
+
+      let demographicData = cleanData(demoData);
+      let filteredDemographicData = demographicData;
+
+      // listing to data selection changes
+      document.addEventListener("worldMapClicked", function (event) {
+
+        _selectedCountries = event.detail.selectedCountries;
+        if (_selectedCountries.length === 0) {
+          filteredDemographicData = demographicData;
+        } else {
+          filteredDemographicData = demographicData.filter(el => _selectedCountries.includes(el.country_name));
+        }
+        // update bubble plot
+        createBubbleScatterplot("#bubble-scatterplot", filteredDemographicData);
+
+        // update time line chart
+        createLineChart("#time-series-line-chart", filteredDemographicData);
+
+        // update parallel coords plot
+        console.log(filteredDemographicData);
+        createParallelCoordsPlot("#parallel-coordinates-plot", filteredDemographicData);
+      })
+
+      // listing to data selection changes
+      document.addEventListener("timePlotBrushed", function (event) {
+        let timeRange = [event.detail.timeRange[0].getFullYear(), event.detail.timeRange[1].getFullYear()];
+
+        if (_selectedCountries.length === 0) {
+          filteredDemographicData = demographicData
+        } else {
+          filteredDemographicData = demographicData.filter(countryData => _selectedCountries.includes(countryData.country_name))
+        }
+
+        filteredDemographicData = filteredDemographicData.map(countryData => {
+
+          let yearwiseData = countryData.yearwiseData.filter(yearlyData => {
+            let year = parseInt(yearlyData.year)
+            return (year >= parseInt(timeRange[0]) && year <= parseInt(timeRange[1]))
+          })
+
+          return ({
+            "country_name": countryData.country_name,
+            "yearwiseData": yearwiseData
+          })
+        })
+        // update world map
+        updateWorldMap("#world-map", filteredDemographicData);
+        // update bubble plot
+        createBubbleScatterplot("#bubble-scatterplot", filteredDemographicData);
+        createParallelCoordsPlot("#parallel-coordinates-plot", filteredDemographicData);
+      })
+
+      // event listener for bubblePlotBrushed
+      document.addEventListener("bubblePlotBrushed", function (event) {
+        _selectedCountries = event.detail.selectedCountries;
+
+        // update time line chart
+        if (_selectedCountries.length === 0) {
+          createLineChart("#time-series-line-chart", demographicData);
+          createWorldMap("#world-map", demographicData);
+          createBubbleScatterplot("#bubble-scatterplot", demographicData);
+          createParallelCoordsPlot("#parallel-coordinates-plot", demographicData);
+
+        } else {
+          filteredDemographicData = demographicData.filter(el => _selectedCountries.includes(el.country_name));
+          createLineChart("#time-series-line-chart", filteredDemographicData);
+          updateWorldMap("#world-map", filteredDemographicData);
+          createParallelCoordsPlot("#parallel-coordinates-plot", filteredDemographicData);
+        }
+      })
+
+      createWorldMap("#world-map", demographicData);
+      createLineChart("#time-series-line-chart", demographicData);
+      $.get("/getMdsRandCorrData", createMds);
+      createBubbleScatterplot("#bubble-scatterplot", demographicData);
+      createParallelCoordsPlot("#parallel-coordinates-plot", demographicData);
+    });
+
+    function resetData() {
+      _selectedCountries = []
+
+      _selectedCountries = [];
+
+
+      d3.csv("/static/data/Clean-Data.csv", function (err, demoData) {
+        setVisible('#mds-corr-plot', false);
+        setVisible('#mds-plot-loader', true);
+
+        let demographicData = cleanData(demoData);
+        createLineChart("#time-series-line-chart", demographicData);
+        createWorldMap("#world-map", demographicData);
+        $.get("/getMdsRandCorrData", createMds);
+        createBubbleScatterplot("#bubble-scatterplot", demographicData);
+        createParallelCoordsPlot("#parallel-coordinates-plot", demographicData);
+      })
+    }
+
+
+    function setVisible(selector, visible) {
+      document.querySelector(selector).style.display = visible ? 'block' : 'none';
+    }
+
+    //create mds plot
+    function createMds(data) {
+      setVisible('#mds-corr-plot', true);
+      setVisible('#mds-plot-loader', false);
+      let headers = data['data'][0].headers;
+      let MdsRandCorrData = data['data'][0].data;
+      let randomInputData = data['data'][0].randomInputData;
+
+
+      let plotData = [];
+
+      randomInputData.forEach((inputData, i) => {
+        plotData.push({
+          "x": MdsRandCorrData[i][0],
+          "y": MdsRandCorrData[i][1],
+          "country": inputData[0],
+          "year": inputData[1],
+          "total_fertility_rate": inputData[2],
+          "growth_rate": inputData[3],
+          "midyear_population": inputData[4],
+          "infant_mortality": inputData[12],
+          "life_expectancy": inputData[15],
+        })
+      })
+      createMdsPlot("#mds-corr-plot", plotData)
+    }
+
+    //clean data to use in visualizations
+    function cleanData(demographicData) {
+      let consizeDemographicData = []
+
+      demographicData.forEach(dataPoint => {
+        if (!consizeDemographicData.some(el => el.country_name === dataPoint.country_name)) {
+          consizeDemographicData.push({
+            "country_name": dataPoint.country_name,
+            "yearwiseData": [{
+              "year": dataPoint.year,
+              "data": {
+                "life_expectancy": dataPoint.life_expectancy,
+                "growth_rate": dataPoint.growth_rate,
+                "midyear_population": dataPoint.midyear_population,
+                "total_fertility_rate": dataPoint.total_fertility_rate,
+                "infant_mortality": dataPoint.infant_mortality,
+              }
+            }]
+          })
+
+        } else {
+
+          consizeDemographicData.find(el => el.country_name === dataPoint.country_name)["yearwiseData"].push({
+            "year": dataPoint.year,
+            "data": {
+              "life_expectancy": dataPoint.life_expectancy,
+              "growth_rate": dataPoint.growth_rate,
+              "midyear_population": dataPoint.midyear_population,
+              "total_fertility_rate": dataPoint.total_fertility_rate,
+              "infant_mortality": dataPoint.infant_mortality,
+            }
+          })
+        }
+      })
+      return consizeDemographicData
+    }
+  </script>
+
+
+
+</head>
+
+<body>
+
+  <div id="dashboard-header">
+    Life Expectancy Dashboard
+    <button id="reset-button">Reset data</button>
+  </div>
+
+  <section class="dashboard">
+    <div id='world-map-container'>
+      <h2 id="vis-header">World Map</h2>
+      <div id='world-map'></div>
+    </div>
+
+    <div id='parallel-coordinates-plot-container'>
+      <h2 id="vis-header">Parallel coordinates plot</h2>
+      <div id='parallel-coordinates-plot'> </div>
+    </div>
+    <div id='mds-corr-plot-container'>
+      <h2 id="vis-header">MDS: Random Sampling (Corr)</h2>
+      <div id='mds-corr-plot'></div>
+      <div id="mds-plot-loader">
+        Loading...
+      </div>
+    </div>
+    <div id='time-series-line-chart-container'>
+      <h2 id="vis-header">Life expectancy vs Year</h2>
+      <div id='time-series-line-chart'></div>
+    </div>
+    <div id='bubble-scatterplot-container'>
+      <h2 id="vis-header">Life expectancy vs Year Scatterplot</h2>
+      <div id='bubble-scatterplot'> </div>
+    </div>
+  </section>
+</body>
+
+
+</html>
